@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from Circuit import Circuit
 from SystemSettings import SystemSettings
 
@@ -56,12 +55,11 @@ class Solution:
     def compute_power_mismatch(self):
         P_calc, Q_calc = self.compute_power_injection()
         bus_list = list(self.circuit.buses.keys())
-
-        # create mappings from bus name to index
         bus_index = {name: idx for idx, name in enumerate(bus_list)}
 
-        # first compute ΔP for all non-slack buses
         delta_p = []
+        delta_q = []
+
         for bus_name in bus_list:
             bus = self.circuit.buses[bus_name]
             if bus.bus_type == "Slack Bus":
@@ -76,14 +74,20 @@ class Solution:
                 if load.bus.name == bus_name:
                     p_specified -= load.real_power / SystemSettings.Sbase
 
+            # --- SYNCHRONOUS CONDENSER REAL POWER LOSS CONTRIBUTION ---
+            for syncon in self.circuit.syncons.values():
+                if syncon.bus.name == bus_name:
+                    # estimate real power loss of syncon as 2% of rated reactive power (q_max), converted to per unit
+                    p_loss_mw = 0.02 * syncon.q_max
+                    p_specified -= p_loss_mw / SystemSettings.Sbase
+                    # this models internal friction/windage losses as a small constant MW draw
+
             i = bus_index[bus_name]
             delta_p.append(p_specified - P_calc[i])
 
-        # then compute ΔQ for only PQ buses
-        delta_q = []
         for bus_name in bus_list:
             bus = self.circuit.buses[bus_name]
-            if bus.bus_type != "PQ Bus":
+            if bus.bus_type not in ["PQ Bus", "PV Bus"]:
                 continue
 
             q_specified = 0
@@ -95,10 +99,23 @@ class Solution:
                 if load.bus.name == bus_name:
                     q_specified -= load.reactive_power / SystemSettings.Sbase
 
-            i = bus_index[bus_name]
-            delta_q.append(q_specified - Q_calc[i])
+            # --- SYNCHRONOUS CONDENSER REACTIVE POWER CONTROL ---
+            for syncon in self.circuit.syncons.values():
+                if syncon.bus.name == bus_name:
+                    # convert specified reactive power back to MVAR for limit checking
+                    # e the Q limits set by the condenser model and clamp q_output if outside bounds
+                    q_output, limit_hit = syncon.enforce_q_limits(q_specified * SystemSettings.Sbase)
+                    q_specified = q_output / SystemSettings.Sbase  # Convert result back to per unit for use in mismatch
 
-        # return full mismatch vector
+                    # if the synchronous condenser hits a reactive power limit, it can no longer regulate voltage and behaves like a PQ bus (both P and Q are fixed instead of V and P)
+                    if limit_hit:
+                        bus.bus_type = "PQ Bus"
+
+            # 0nly compute a mismatch term if the bus is a PQ bus
+            if bus.bus_type == "PQ Bus":
+                i = bus_index[bus_name]
+                delta_q.append(q_specified - Q_calc[i])
+
         return np.array(delta_p + delta_q)
 
     def newton_raphson(self, tolerance=0.001, max_iterations=50):
@@ -359,6 +376,8 @@ if __name__ == "__main__":
     circuit1.add_bus("Bus5", 230)
     circuit1.add_bus("Bus6", 230)
     circuit1.add_bus("Bus7", 18)
+    circuit1.add_bus("Bus8", 230)
+    circuit1.add_bus("Bus9", 20)
 
     # ADD TRANSMISSION LINES
     circuit1.add_conductor("Partridge", 0.642, 0.0217, 0.385, 460)
@@ -371,10 +390,12 @@ if __name__ == "__main__":
     circuit1.add_tline("Line4", "Bus4", "Bus6", "Bundle1", "Geometry1", 20)
     circuit1.add_tline("Line5", "Bus5", "Bus6", "Bundle1", "Geometry1", 10)
     circuit1.add_tline("Line6", "Bus4", "Bus5", "Bundle1", "Geometry1", 35)
+    circuit1.add_tline("Line7", "Bus3", "Bus8", "Bundle1", "Geometry1", 10)
 
     # ADD TRANSMORMERS
     circuit1.add_transformer("T1", "Bus1", "Bus2", 125, 8.5, 10, "delta-y", 1)
     circuit1.add_transformer("T2", "Bus6", "Bus7", 200, 10.5, 12, "delta-y", 999999)
+    circuit1.add_transformer("T3", "Bus8", "Bus9", 125, 8.5, 10, "delta-y", 1)
 
     # ADD GENERATORS
     circuit1.add_generator("G1", "Bus1", 20, 100, 0, True)
@@ -385,10 +406,8 @@ if __name__ == "__main__":
     circuit1.add_load("L2", "Bus4", 100, 70)
     circuit1.add_load("L3", "Bus5", 100, 65)
 
-    print(f"Bus1 type: {circuit1.buses['Bus1'].bus_type}")  # Should print "Slack Bus"
-    print(f"Bus2 type: {circuit1.buses['Bus2'].bus_type}")  # Should print "PQ Bus"
-    print(f"Bus7 type: {circuit1.buses['Bus7'].bus_type}")  # Should print "PV Bus"
-
+    # ADD SYNCHRONOUS CONDENSER
+    circuit1.add_sync_condenser("SC1", "Bus9", 50)
 
     solution = Solution(circuit1)
 

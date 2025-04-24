@@ -18,6 +18,7 @@ from TransmissionLine import TransmissionLine
 from Transformer import Transformer
 from Generator import Generator
 from Load import Load
+from SynchronousCondenser import SynchronousCondenser
 class Circuit:
 
     def __init__(self, name: str):
@@ -30,6 +31,7 @@ class Circuit:
         self.transmissionlines: Dict[str, TransmissionLine] = {}
         self.generators: Dict[str, Generator] = {}
         self.loads: Dict[str, Load] = {}
+        self.syncons: Dict[str, SynchronousCondenser] = {}
 
         self.slack_bus = None
         self.ybus = self.calc_ybus()
@@ -154,6 +156,23 @@ class Circuit:
         if name in self.loads:
             raise ValueError(f"Load '{name}' already exists.")
         self.loads[name] = Load(name, self.buses[bus], real_power, reactive_power)
+
+    def add_sync_condenser(self, name, bus_name, q_max):
+        # check if the specified bus exists in the circuit
+        if bus_name not in self.buses:
+            raise ValueError(f"Bus '{bus_name}' not found.")  # Bus must already be defined
+
+        if name in self.syncons:
+            raise ValueError(f"Synchronous condenser '{name}' already exists.")  # Prevent duplicates
+
+        bus = self.buses[bus_name]  # Get the bus object from the circuit dictionary
+
+        if bus.bus_type == "Slack Bus": # prevent placing a synchronous condenser at the slack bus
+            raise ValueError("Cannot place a synchronous condenser on a slack bus.")
+
+        bus.bus_type = "PV Bus"  # Synchronous condensers regulate voltage by adjusting their reactive power,so their bus must initially be treated as a PV Bus (voltage-controlled bus)
+
+        self.syncons[name] = SynchronousCondenser(name, bus, q_max)
 
     def calc_ybus(self):
         busnames = list(self.buses.keys())
@@ -301,6 +320,8 @@ if __name__ == "__main__":
         circuit1.add_bus("Bus5", 230)
         circuit1.add_bus("Bus6", 230)
         circuit1.add_bus("Bus7", 18)
+        circuit1.add_bus("Bus8", 230)
+        circuit1.add_bus("Bus9", 20)
 
         # ADD TRANSMISSION LINES
         circuit1.add_conductor("Partridge", 0.642, 0.0217, 0.385, 460)
@@ -313,10 +334,12 @@ if __name__ == "__main__":
         circuit1.add_tline("Line4", "Bus4", "Bus6", "Bundle1", "Geometry1", 20)
         circuit1.add_tline("Line5", "Bus5", "Bus6", "Bundle1", "Geometry1", 10)
         circuit1.add_tline("Line6", "Bus4", "Bus5", "Bundle1", "Geometry1", 35)
+        circuit1.add_tline("Line7", "Bus3", "Bus8", "Bundle1", "Geometry1", 10)
 
         # ADD TRANSMORMERS
         circuit1.add_transformer("T1", "Bus1", "Bus2", 125, 8.5, 10, "delta-y", 1)
         circuit1.add_transformer("T2", "Bus6", "Bus7", 200, 10.5, 12, "delta-y", 999999)
+        circuit1.add_transformer("T3", "Bus8", "Bus9",125, 8.5, 10, "delta-y", 1)
 
         # ADD GENERATORS
         circuit1.add_generator("G1", "Bus1", 20, 100, 0, True)
@@ -326,6 +349,9 @@ if __name__ == "__main__":
         circuit1.add_load("L1", "Bus3", 110, 50)
         circuit1.add_load("L2", "Bus4", 100, 70)
         circuit1.add_load("L3", "Bus5", 100, 65)
+
+        # ADD SYNCHRONOUS CONDENSER
+        circuit1.add_sync_condenser("SC1", "Bus9", 50)
 
         # PRINT CHECK
         print(f"Bus1 type: {circuit1.buses['Bus1'].bus_type}")  # Should print "Slack Bus"

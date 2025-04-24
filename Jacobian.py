@@ -3,6 +3,7 @@
 # Jacobian
 
 import numpy as np
+from SystemSettings import SystemSettings
 from Solution import Solution
 from Circuit import Circuit
 
@@ -116,7 +117,7 @@ class Jacobian:
 
 
 if __name__ == "__main__":
-    # create test circuit
+
     circuit1 = Circuit("Test Circuit")
 
     # ADD BUSES
@@ -127,6 +128,8 @@ if __name__ == "__main__":
     circuit1.add_bus("Bus5", 230)
     circuit1.add_bus("Bus6", 230)
     circuit1.add_bus("Bus7", 18)
+    circuit1.add_bus("Bus8", 230)
+    circuit1.add_bus("Bus9", 20)
 
     # ADD TRANSMISSION LINES
     circuit1.add_conductor("Partridge", 0.642, 0.0217, 0.385, 460)
@@ -139,19 +142,24 @@ if __name__ == "__main__":
     circuit1.add_tline("Line4", "Bus4", "Bus6", "Bundle1", "Geometry1", 20)
     circuit1.add_tline("Line5", "Bus5", "Bus6", "Bundle1", "Geometry1", 10)
     circuit1.add_tline("Line6", "Bus4", "Bus5", "Bundle1", "Geometry1", 35)
+    circuit1.add_tline("Line7", "Bus3", "Bus8", "Bundle1", "Geometry1", 10)
 
-    # ADD TRANSFORMERS
-    circuit1.add_transformer("T1", "Bus1", "Bus2", 125, 8.5, 10, "y-y", 0.05)
-    circuit1.add_transformer("T2", "Bus6", "Bus7", 200, 10.5, 12, "y-y", 0.05)
+    # ADD TRANSMORMERS
+    circuit1.add_transformer("T1", "Bus1", "Bus2", 125, 8.5, 10, "delta-y", 1)
+    circuit1.add_transformer("T2", "Bus6", "Bus7", 200, 10.5, 12, "delta-y", 999999)
+    circuit1.add_transformer("T3", "Bus8", "Bus9", 125, 8.5, 10, "delta-y", 1)
 
     # ADD GENERATORS
-    circuit1.add_generator("G1", "Bus1", 20, 100, 0.05, True)
-    circuit1.add_generator("G2", "Bus7", 18, 200, 0.05, True)
+    circuit1.add_generator("G1", "Bus1", 20, 100, 0, True)
+    circuit1.add_generator("G2", "Bus7", 18, 200, 1, True)
 
     # ADD LOAD
     circuit1.add_load("L1", "Bus3", 110, 50)
     circuit1.add_load("L2", "Bus4", 100, 70)
-    circuit1.add_load("L3", "Bus5", 100,65)
+    circuit1.add_load("L3", "Bus5", 100, 65)
+
+    # ADD SYNCHRONOUS CONDENSER
+    circuit1.add_sync_condenser("SC1", "Bus9", 50)
 
     circuit1.calc_ybus_pos_sequence()
 
@@ -165,17 +173,25 @@ if __name__ == "__main__":
 
     # power mismatches
     mismatches = solution.compute_power_mismatch()
-    print("\nPower Mismatch Results:")
-    index = 0
-    for bus_name, bus in circuit1.buses.items():
-        if bus.bus_type == "Slack Bus":
-            continue  # Skip Slack Bus in the mismatch vector
+    print("\nPower Mismatch Results (in MW and Mvar):")
+    bus_list = list(circuit1.buses.keys())
+    p_index = 0
+    q_index = len([b for b in circuit1.buses.values() if b.bus_type != "Slack Bus"])  # start of Qs
 
-        print(f"{bus_name}: ΔP = {mismatches[index]:.4f}")
-        index += 1
+    for bus_name in bus_list:
+        bus = circuit1.buses[bus_name]
+        if bus.bus_type == "Slack Bus":
+            continue
+        dp_mw = mismatches[p_index] * SystemSettings.Sbase
+        print(f"{bus_name}: ΔP = {dp_mw:.2f} MW")
+        p_index += 1
+
+    for bus_name in bus_list:
+        bus = circuit1.buses[bus_name]
         if bus.bus_type == "PQ Bus":
-            print(f"      ΔQ = {mismatches[index]:.4f}")
-            index += 1
+            dq_mvar = mismatches[q_index] * SystemSettings.Sbase
+            print(f"{bus_name}: ΔQ = {dq_mvar:.2f} Mvar")
+            q_index += 1
 
 
     jacobian = Jacobian(solution)

@@ -17,6 +17,8 @@ circuit1.add_bus("Bus4", 230)
 circuit1.add_bus("Bus5", 230)
 circuit1.add_bus("Bus6", 230)
 circuit1.add_bus("Bus7", 18)
+circuit1.add_bus("Bus8", 230)
+circuit1.add_bus("Bus9", 20)
 
 # ADD TRANSMISSION LINES
 circuit1.add_conductor("Partridge", 0.642, 0.0217, 0.385, 460)
@@ -29,10 +31,12 @@ circuit1.add_tline("Line3", "Bus3", "Bus5", "Bundle1", "Geometry1", 20)
 circuit1.add_tline("Line4", "Bus4", "Bus6", "Bundle1", "Geometry1", 20)
 circuit1.add_tline("Line5", "Bus5", "Bus6", "Bundle1", "Geometry1", 10)
 circuit1.add_tline("Line6", "Bus4", "Bus5", "Bundle1", "Geometry1", 35)
+circuit1.add_tline("Line7", "Bus3", "Bus8", "Bundle1", "Geometry1", 10)
 
 # ADD TRANSMORMERS
 circuit1.add_transformer("T1", "Bus1", "Bus2", 125, 8.5, 10, "delta-y", 1)
 circuit1.add_transformer("T2", "Bus6", "Bus7", 200, 10.5, 12, "delta-y", 999999)
+circuit1.add_transformer("T3", "Bus8", "Bus9", 125, 8.5, 10, "delta-y", 1)
 
 # ADD GENERATORS
 circuit1.add_generator("G1", "Bus1", 20, 100, 0, True)
@@ -42,6 +46,9 @@ circuit1.add_generator("G2", "Bus7", 18, 200, 1, True)
 circuit1.add_load("L1", "Bus3", 110, 50)
 circuit1.add_load("L2", "Bus4", 100, 70)
 circuit1.add_load("L3", "Bus5", 100, 65)
+
+# ADD SYNCHRONOUS CONDENSER
+circuit1.add_sync_condenser("SC1", "Bus9", 50)
 
 solution = Solution(circuit1)
 
