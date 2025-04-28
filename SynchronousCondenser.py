@@ -2,8 +2,6 @@
 # ECE 2774
 # Synchronous Condenser
 
-from SystemSettings import SystemSettings
-
 class SynchronousCondenser:
     def __init__(self, name, bus, q_max):
 
@@ -22,7 +20,7 @@ class SynchronousCondenser:
         - q_output (float): The attempted reactive power output in MVAR
 
         Returns:
-        - (float, bool): A tuple with the clamped Q output (within min/max)
+        - (float, bool): The clipped Q output (within min/max)
                          and a flag indicating whether limiting occurred.
         """
 

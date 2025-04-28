@@ -407,7 +407,7 @@ if __name__ == "__main__":
     circuit1.add_load("L3", "Bus5", 100, 65)
 
     # ADD SYNCHRONOUS CONDENSER
-    circuit1.add_sync_condenser("SC1", "Bus9", 50)
+    circuit1.add_sync_condenser("SC1", "Bus9", 250)
 
     solution = Solution(circuit1)
 
