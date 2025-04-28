@@ -1,7 +1,6 @@
-# Project 2 - Power Systems Simulator
-# ECE 2774 - Advanced Power Systems Analysis
-# Group 8
-# Cecilia Espadas & Maria Luiza Hermann
+# Cece Espadas - Project 3
+# ECE 2774
+# Synchronous Condenser
 
 from Circuit import Circuit
 from Solution import Solution
